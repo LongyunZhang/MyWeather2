@@ -42,12 +42,13 @@
             android:layout_gravity="center"
             android:src="@drawable/title_update"/>
 
-        <ImageView
+        <Button
             android:layout_width="45.0dip"
             android:layout_height="45.0dip"
             android:id="@+id/title_share"
             android:layout_toLeftOf="@id/title_update_btn"
-            android:src="@drawable/title_share" />
+            android:src="@drawable/title_share"
+            android:onClick="updateWeather" />
 
         <ImageView
             android:layout_width="45.0dip"
