@@ -40,15 +40,14 @@
             android:layout_alignParentRight="true"
             android:layout_alignRight="@+id/title_city_name"
             android:layout_gravity="center"
-            android:src="@drawable/title_update"/>
+            android:src="@drawable/title_update" />
 
-        <Button
+        <ImageView
             android:layout_width="45.0dip"
             android:layout_height="45.0dip"
             android:id="@+id/title_share"
             android:layout_toLeftOf="@id/title_update_btn"
-            android:src="@drawable/title_share"
-            android:onClick="updateWeather" />
+            android:src="@drawable/title_share"/>
 
         <ImageView
             android:layout_width="45.0dip"
@@ -208,6 +207,7 @@
             android:id="@+id/button1"
             android:layout_below="@id/linearLayout"
             android:layout_toRightOf="@+id/content_city_time_humidity"
-            android:layout_marginTop="61dp" />
+            android:layout_marginTop="61dp"
+            android:onClick="updateWeatherfengli"/>
     </RelativeLayout>
 </RelativeLayout>
