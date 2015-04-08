@@ -1,6 +1,11 @@
 package com.secret.myweather2;
 
+import android.app.Activity;
+import android.app.ProgressDialog;
+import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.ActionBarActivity;
@@ -9,21 +14,15 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.util.Log;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import android.widget.Toast;
 
-import java.io.StringReader;
-import java.util.Calendar;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.zip.GZIPInputStream;
+import com.secret.myweather2.com.secret.bean.TodayWeather;
+import com.secret.myweather2.com.secret.util.NetUtil;
+import com.secret.myweather2.com.secret.util.PinYin;
+import com.secret.myweather2.myapp.MyApplication;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -33,25 +32,35 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
-import android.widget.Toast;
-
-import com.secret.myweather2.com.secret.bean.TodayWeather;
-import com.secret.myweather2.com.secret.util.NetUtil;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.StringReader;
+import java.lang.reflect.Field;
+import java.util.zip.GZIPInputStream;
 
 public class MainActivity extends ActionBarActivity implements View.OnClickListener {
-    private ImageView mUpdateBtn,weatherImg,pmImg;
-    private TextView cityTv,timeTv,shiduTv,weekTv,pmTv,qualityTv,tempertureTv,tianqiTv,fengliTv;
+    private static ImageView mUpdateBtn, chooseCity, weatherImg, pmImg;
+    private static TextView cityTv, timeTv, shiduTv, weekTv, pmTv, qualityTv, tempertureTv, tianqiTv, fengliTv;
+    private static Activity mActivity;
+    public static final int UPDATE = 0;
+    public static final int RESPONSE = 1;
+    private ProgressDialog dialog;
 
-    void initView(){
-        cityTv =(TextView) findViewById(R.id.content_city_name);
-        timeTv =(TextView) findViewById(R.id.content_publish_time);
-        shiduTv =(TextView) findViewById(R.id.content_humidity);
-        weekTv =(TextView) findViewById(R.id.content_date);
-        pmTv =(TextView) findViewById(R.id.content_pm_describe);
-        qualityTv =(TextView) findViewById(R.id.content_pm_value);
-        tempertureTv =(TextView) findViewById(R.id.content_temperature);
-        tianqiTv =(TextView) findViewById(R.id.content_weather_describe1);
-        fengliTv =(TextView) findViewById(R.id.content_weather_describe2);
+    public static Activity getInstance() {
+        return mActivity;
+    }
+
+    void initView() {
+        cityTv = (TextView) findViewById(R.id.content_city_name);
+        timeTv = (TextView) findViewById(R.id.content_publish_time);
+        shiduTv = (TextView) findViewById(R.id.content_humidity);
+        weekTv = (TextView) findViewById(R.id.content_date);
+        pmTv = (TextView) findViewById(R.id.content_pm_value);
+        qualityTv = (TextView) findViewById(R.id.content_pm_describe);
+        tempertureTv = (TextView) findViewById(R.id.content_temperature);
+        tianqiTv = (TextView) findViewById(R.id.content_weather_describe1);
+        fengliTv = (TextView) findViewById(R.id.content_weather_describe2);
         cityTv.setText("N/A");
         timeTv.setText("N/A");
         shiduTv.setText("N/A");
@@ -61,14 +70,29 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         tempertureTv.setText("N/A");
         tianqiTv.setText("N/A");
         fengliTv.setText("N/A");
+        pmImg = (ImageView) findViewById(R.id.content_pm_pic);
+        weatherImg = (ImageView) findViewById(R.id.content_weather_pic);
     }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.mylayout);
+        Log.d("Main", "onCreate");
+        if (NetUtil.getNetworkState(this) != NetUtil.NETWORN_NONE) {
+            Log.d("xk", "Internet connected!");
+            Toast.makeText(MainActivity.this, "网络正常", Toast.LENGTH_LONG).show();
+        } else {
+            Log.d("xk", "Not connected");
+            Toast.makeText(MainActivity.this, "网络连接失败", Toast.LENGTH_LONG).show();
+        }
+
         mUpdateBtn = (ImageView) findViewById(R.id.title_update_btn);
         mUpdateBtn.setOnClickListener(this);
+        chooseCity = (ImageView) findViewById(R.id.title_city_manager);
+        chooseCity.setOnClickListener(this);
         initView();
+        queryWeatherCode("101010100");
     }
 
 
@@ -76,13 +100,6 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.menu_main, menu);
-        if (NetUtil.getNetworkState(this) != NetUtil.NETWORN_NONE) {
-            Log.d("xk", "Internet connected!");
-            Toast.makeText(MainActivity.this, "网OK!", Toast.LENGTH_LONG).show();
-        } else {
-            Log.d("xk", "Not connected");
-            Toast.makeText(MainActivity.this, "网挂了!", Toast.LENGTH_LONG).show();
-        }
         return true;
     }
 
@@ -102,10 +119,6 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
     }
 
 
-
-    public static final int UPDATE = 0;
-    public static final int RESPONSE = 1;
-
     public void onClick(View view) {
         if (view.getId() == R.id.title_update_btn) {
             SharedPreferences sharedPreferences = getSharedPreferences("config", MODE_PRIVATE);
@@ -113,14 +126,108 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
             Log.d("myWeather", cityCode);
             queryWeatherCode(cityCode);
 
+        }
+        if (view.getId() == R.id.title_city_manager) {
+            Intent intent = new Intent(MainActivity.this, ChooseCity.class);
+            startActivityForResult(intent, 1);
+        }
+    }
+
+    protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
+        if (requestCode == 1 && resultCode == RESULT_OK) {
+            String str = intent.getStringExtra("city");
+            String number = MyApplication.getCodeByName(str);
+            Toast.makeText(this, "您选中了：" + str, Toast.LENGTH_SHORT).show();
+            queryWeatherCode(number);
+        }
+    }
+
+
+    public Handler uiHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case UPDATE:
+                    updateUI((TodayWeather) msg.obj);
+                    break;
+                default:
+                    break;
             }
         }
+    };
+    public Handler getuiHandler(){
+        return uiHandler;
+    }
 
+    public void updateUI(TodayWeather todayWeather) {
+        Log.d("json", todayWeather.toString());
+        cityTv.setText(todayWeather.getCity());
+        timeTv.setText(todayWeather.getUpdatetime() + "发布");
+        shiduTv.setText("湿度：" + todayWeather.getHumidity());
+        pmTv.setText(todayWeather.getPm25());
+        qualityTv.setText(todayWeather.getQuality());
+        weekTv.setText(todayWeather.getDate());
+        tempertureTv.setText(todayWeather.getTemperature() + "℃" + "(" + todayWeather.getLow() + "~" + todayWeather.getHigh() + ")");
+        tianqiTv.setText(todayWeather.getClimate());
+        fengliTv.setText(todayWeather.getWind());
 
+        String pmImgStr = "0_50";
+        if (null != todayWeather.getPm25()) {
+            int pmValue = Integer.parseInt(todayWeather.getPm25().trim());
+            if (pmValue > 50 && pmValue < 201) {
+                int startV = (pmValue - 1) / 50 * 50 + 1;
+                int endV = ((pmValue - 1) / 50 + 1) * 50;
+                pmImgStr = Integer.toString(startV) + "_" + endV;
+            } else if (pmValue >= 201 && pmValue < 301) {
+                pmImgStr = "201_300";
+            } else if (pmValue >= 301) {
+                pmImgStr = "greater_300";
+            }
+        }
+        String typeImg =
+                "biz_plugin_weather_" + PinYin.converterToSpell(todayWeather.getClimate());
+        Class aClass = R.drawable.class;
+        int typeId = -1;
+        int pmImgId = -1;
+        try {
+            //一般尽量采用这种形式
+            Field pmField = aClass.getField("biz_plugin_weather_" + pmImgStr);
+            Object pmImgO = pmField.get(new Integer(0));
+            pmImgId = (Integer) pmImgO;
 
+            Field field = aClass.getField(typeImg);
+            Object value = field.get(
+                    new Integer(0));
+            typeId = (Integer) value;
+
+        } catch (Exception e) { //e.printStackTrace(); if ( -1 == typeId)
+            e.printStackTrace();
+            if (-1 == typeId)
+                typeId = R.drawable.biz_plugin_weather_qing;
+            if (-1 == pmImgId)
+                pmImgId = R.drawable.biz_plugin_weather_0_50;
+        } finally {
+            Drawable drawable = getResources().getDrawable(pmImgId);
+            pmImg.setImageDrawable(drawable);
+            drawable = getResources().getDrawable(typeId);
+            weatherImg.setImageDrawable(drawable);
+            Toast.makeText(MainActivity.this, "更新成功", Toast.LENGTH_SHORT).show();
+            dialog.cancel();
+        }
+    }
     public void queryWeatherCode(String cityCode) {
+        dialog=ProgressDialog.show(this,null,"更新天气中……",false,true);
         final String address = "http://wthrcdn.etouch.cn/WeatherApi?citykey=" + cityCode;
+        //final MainActivity mainActivity= (MainActivity)context;
         Log.d("myWeather", address);
+        if (NetUtil.getNetworkState(this) != NetUtil.NETWORN_NONE) {
+            Log.d("xk", "Internet connected!");
+            //Toast.makeText(MainActivity.this, "网OK!", Toast.LENGTH_LONG).show();
+        } else {
+            Log.d("xk", "Not connected");
+            Toast.makeText(this, "网络连接失败!", Toast.LENGTH_LONG).show();
+        }
+
         new Thread(
                 new Runnable() {
                     @Override
@@ -141,13 +248,18 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
                                 while ((str = reader.readLine()) != null) {
                                     response.append(str);
                                 }
-                                parseXML(response.toString());
-/*
-                                Message msg = new Message();
-                                msg.what = UPDATE;
-                                msg.obj = response.toString();
-                                handler.sendMessage(msg);
-*/
+                                Log.d("printJSON", response.toString());
+                                TodayWeather todayWeather;
+                                todayWeather=parseXML(response.toString());//parseXML
+                                if (todayWeather != null) {
+                                    Message msg = new Message();
+                                    msg.what = UPDATE;
+                                    msg.obj = todayWeather;
+                                    uiHandler.sendMessage(msg);//sendMessage
+                                    Log.d("ALL", todayWeather.toString());
+                                }
+
+                                //parseJSON(response.toString());
                             }
                         } catch (Exception e)
 
@@ -158,19 +270,6 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
                 }
         ).start();
     }
-
-    private Handler handler = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-                case UPDATE:
-                    updateWeather((TodayWeather) msg.obj);
-                    break;
-                default:
-                    break;
-            }
-        }
-    };
 
     public TodayWeather parseXML(String xmldata) {
 
@@ -283,27 +382,10 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         } catch (Exception e) {
             e.printStackTrace();
         }
-        if (todayWeather != null) {
-            Message msg= new Message();
-            msg.what=UPDATE;
-            msg.obj=todayWeather;
-            handler.sendMessage(msg);
-            Log.d("ALL", todayWeather.toString());
-        }
-            return todayWeather;
+        return todayWeather;
     }
 
-    public void updateWeather(TodayWeather today) {
-        Log.d("json",today.toString());
-        cityTv.setText(today.getCity());
-        timeTv.setText(today.getUpdatetime() + "发布");
-        shiduTv.setText("湿度：" + today.getHumidity());
-        pmTv.setText(today.getPm25());
-        qualityTv.setText(today.getQuality());
-        weekTv.setText(today.getDate());
-        tempertureTv.setText(today.getTemperature()+"℃"+"("+today.getLow() + "~" + today.getHigh()+")");
-        tianqiTv.setText(today.getClimate());
-        fengliTv.setText(today.getWind());
-        Toast.makeText(MainActivity.this,"更新成功",Toast.LENGTH_SHORT).show();
-    }
 }
+
+
+
