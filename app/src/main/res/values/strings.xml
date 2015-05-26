@@ -4,4 +4,6 @@
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
     <string name="title_activity_parse_xml">parseXML</string>
+    <string name="title_activity_choose_city">ChooseCity</string>
+    <string name="title_activity_text_watcher">TextWatcher</string>
 </resources>

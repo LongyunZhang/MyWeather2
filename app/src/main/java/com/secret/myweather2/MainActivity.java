@@ -8,20 +8,26 @@ import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Message;
+import android.support.v4.view.ViewPager;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.util.Log;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import android.widget.Toast;
 
 import com.secret.myweather2.com.secret.bean.TodayWeather;
+import com.secret.myweather2.com.secret.util.MyViewPager;
 import com.secret.myweather2.com.secret.util.NetUtil;
+import com.secret.myweather2.com.secret.util.PageChangeListener;
 import com.secret.myweather2.com.secret.util.PinYin;
+import com.secret.myweather2.com.secret.util.ViewPagerAdapter;
 import com.secret.myweather2.myapp.MyApplication;
 
 import org.apache.http.HttpEntity;
@@ -37,48 +43,35 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 public class MainActivity extends ActionBarActivity implements View.OnClickListener {
     private static ImageView mUpdateBtn, chooseCity, weatherImg, pmImg;
     private static TextView cityTv, timeTv, shiduTv, weekTv, pmTv, qualityTv, tempertureTv, tianqiTv, fengliTv;
+    private static Button btn_delete;
     private static Activity mActivity;
     public static final int UPDATE = 0;
     public static final int RESPONSE = 1;
     private ProgressDialog dialog;
+    private int currentPageNo=0;
+    private PageChangeListener pageChangeListener;
 
-    public static Activity getInstance() {
-        return mActivity;
-    }
+    private List<View> views;
+    private ViewPagerAdapter viewPagerAdapter;
+    private ViewPager viewPager;
 
-    void initView() {
-        cityTv = (TextView) findViewById(R.id.content_city_name);
-        timeTv = (TextView) findViewById(R.id.content_publish_time);
-        shiduTv = (TextView) findViewById(R.id.content_humidity);
-        weekTv = (TextView) findViewById(R.id.content_date);
-        pmTv = (TextView) findViewById(R.id.content_pm_value);
-        qualityTv = (TextView) findViewById(R.id.content_pm_describe);
-        tempertureTv = (TextView) findViewById(R.id.content_temperature);
-        tianqiTv = (TextView) findViewById(R.id.content_weather_describe1);
-        fengliTv = (TextView) findViewById(R.id.content_weather_describe2);
-        cityTv.setText("N/A");
-        timeTv.setText("N/A");
-        shiduTv.setText("N/A");
-        weekTv.setText("N/A");
-        pmTv.setText("N/A");
-        qualityTv.setText("N/A");
-        tempertureTv.setText("N/A");
-        tianqiTv.setText("N/A");
-        fengliTv.setText("N/A");
-        pmImg = (ImageView) findViewById(R.id.content_pm_pic);
-        weatherImg = (ImageView) findViewById(R.id.content_weather_pic);
-    }
+    private LayoutInflater layoutInflater;
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.mylayout);
-        Log.d("Main", "onCreate");
+        Log.d("MyAPP", "Main onCreate");
         if (NetUtil.getNetworkState(this) != NetUtil.NETWORN_NONE) {
             Log.d("xk", "Internet connected!");
             Toast.makeText(MainActivity.this, "网络正常", Toast.LENGTH_LONG).show();
@@ -91,10 +84,74 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         mUpdateBtn.setOnClickListener(this);
         chooseCity = (ImageView) findViewById(R.id.title_city_manager);
         chooseCity.setOnClickListener(this);
-        initView();
-        queryWeatherCode("101010100");
+        MyApplication.addFavorCity("北京");
+        initViewPager();
+
+        initView(currentPageNo);
+        Log.d("MyAPP", "initView");
+
+
+    }
+    void initView(int no) {
+        cityTv = (TextView) views.get(no).findViewById(R.id.content_city_name);
+        timeTv = (TextView) views.get(no).findViewById(R.id.content_publish_time);
+        shiduTv = (TextView) views.get(no).findViewById(R.id.content_humidity);
+        weekTv = (TextView) views.get(no).findViewById(R.id.content_date);
+        pmTv = (TextView) views.get(no).findViewById(R.id.content_pm_value);
+        qualityTv = (TextView) views.get(no).findViewById(R.id.content_pm_describe);
+        tempertureTv = (TextView) views.get(no).findViewById(R.id.content_temperature);
+        tianqiTv = (TextView) views.get(no).findViewById(R.id.content_weather_describe1);
+        fengliTv = (TextView) views.get(no).findViewById(R.id.content_weather_describe2);
+        cityTv.setText("N/A");
+        timeTv.setText("N/A");
+        shiduTv.setText("N/A");
+        weekTv.setText("N/A");
+        pmTv.setText("N/A");
+        qualityTv.setText("N/A");
+        tempertureTv.setText("N/A");
+        tianqiTv.setText("N/A");
+        fengliTv.setText("N/A");
+        pmImg = (ImageView) views.get(no).findViewById(R.id.content_pm_pic);
+        weatherImg = (ImageView) views.get(no).findViewById(R.id.content_weather_pic);
+        List<Map<String,String>> mFavorCity = new ArrayList<Map<String, String>>();
+        mFavorCity=MyApplication.getFavorCity();
+        String cityname=mFavorCity.get(no).get("city");
+        Log.d("MyApp citycode","before");
+
+        String citycode=MyApplication.getCodeByName(cityname);
+        Log.d("MyApp citycode after", citycode);
+        queryWeatherCode(citycode);
     }
 
+    private void initViewPager() {
+        layoutInflater = LayoutInflater.from(this);
+        views = new ArrayList<View>();
+        views.add(layoutInflater.inflate(R.layout.innerlayout1, null));
+        viewPagerAdapter = new ViewPagerAdapter(views, this);
+        viewPager = (ViewPager) findViewById(R.id.viewpager);
+        viewPager.setAdapter(viewPagerAdapter);
+        viewPager.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+            @Override
+            public void onPageSelected(int position) {
+                try {
+                    initView(position);
+                    currentPageNo=position;
+                    btn_delete=(Button)views.get(currentPageNo).findViewById(R.id.btn_delete);
+                    btn_delete.setOnClickListener(MainActivity.this);
+                    Log.d("PageChange to :", String.valueOf(position));
+                } catch (Exception e){
+                    e.printStackTrace();
+                }
+            }
+
+            @Override
+            public void onPageScrollStateChanged(int a) {
+            }
+
+            public void onPageScrolled(int a, float b, int c) {
+            }
+        });
+    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -129,8 +186,16 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         }
         if (view.getId() == R.id.title_city_manager) {
             Intent intent = new Intent(MainActivity.this, ChooseCity.class);
-            startActivityForResult(intent, 1);
+            //startActivityForResult(intent, 1);
+            startActivityForResult(intent, 2);
         }
+        if (view.getId() == R.id.btn_delete){
+
+            views.remove(currentPageNo);
+            viewPagerAdapter.notifyDataSetChanged();
+        }
+        Log.d("current button:",String.valueOf(view.getId()));
+        Log.d("delete button:",String.valueOf(R.id.btn_delete));
     }
 
     protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
@@ -139,6 +204,14 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
             String number = MyApplication.getCodeByName(str);
             Toast.makeText(this, "您选中了：" + str, Toast.LENGTH_SHORT).show();
             queryWeatherCode(number);
+        }
+        if (requestCode == 2 && resultCode == RESULT_OK) {
+            String str = intent.getStringExtra("city");
+            MyApplication.addFavorCity(str);
+            views.add(layoutInflater.inflate(R.layout.innerlayout1, null));
+            viewPagerAdapter.notifyDataSetChanged();
+
+            Log.d("MyFavoriteCity", MyApplication.getFavorCity().toString());
         }
     }
 
@@ -155,9 +228,6 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
             }
         }
     };
-    public Handler getuiHandler(){
-        return uiHandler;
-    }
 
     public void updateUI(TodayWeather todayWeather) {
         Log.d("json", todayWeather.toString());

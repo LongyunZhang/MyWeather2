@@ -4,18 +4,18 @@ package com.secret.myweather2.com.secret.bean;
  * Created by sekike on 15-3-24.
  */
 public class TodayWeather {
-    private String city;
-    private String updatetime;
-    private String temperature;
-    private String humidity;
-    private String pm25;
-    private String quality;
-    private String fengxiang;
-    private String wind;
-    private String date;
-    private String high;
-    private String low;
-    private String climate;
+    private String city = null;
+    private String updatetime = null;
+    private String temperature = null;
+    private String humidity = null;
+    private String pm25 = null;
+    private String quality = null;
+    private String fengxiang = null;
+    private String wind = null;
+    private String date = null;
+    private String high = null;
+    private String low = null;
+    private String climate = null;
 
     public void setCity(String arg){
         city=arg;
